@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --primary: 0 72% 51%;
+    --secondary: 0 0% 10%;
+    --border: 0 0% 20%;
+    
+    /* Fluid scale for Typography & Padding */
+    --h1-fluid: clamp(2.5rem, 8vw + 1rem, 5rem);
+    --h2-fluid: clamp(1.5rem, 5vw + 1rem, 3rem);
+    --p-fluid: clamp(0.875rem, 0.5vw + 0.8rem, 1.125rem);
+    --container-padding: clamp(1rem, 5vw, 2rem);
+  }
+
+  body {
+    @apply bg-black text-white font-body antialiased selection:bg-primary/30;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  h1 { font-size: var(--h1-fluid); }
+  h2 { font-size: var(--h2-fluid); }
+  p { font-size: var(--p-fluid); }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-zinc-900/40 backdrop-blur-md border border-white/10 rounded-none shadow-2xl;
+  }
+}
+
+/* Utilities for Responsive Control */
+.mobile-safe-padding {
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+.hfn-crimson { color: #DC2626; }
+.hfn-bg { background-color: #1A1A1A; }
+
+/* Prevent horizontal scroll on mobile */
+* {
+  max-width: 100%;
+  box-sizing: border-box;
+}
