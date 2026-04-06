@@ -30,6 +30,7 @@ interface Lead {
   score?: number;
   tags?: string[];
   utm_source?: string;
+  is_muted?: boolean;
 }
 
 interface Message {
@@ -246,6 +247,24 @@ export default function Dashboard() {
     }
   };
 
+  const handleToggleMute = async (leadId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('hfn_funnel_leads')
+        .update({ is_muted: !currentStatus })
+        .eq('id', leadId);
+      
+      if (error) throw error;
+      
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, is_muted: !currentStatus } : l));
+      if (selectedLead?.id === leadId) setSelectedLead({ ...selectedLead, is_muted: !currentStatus });
+      
+      toast.success(!currentStatus ? "Automação pausada para este lead" : "Automação reativada");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-6 bg-hfn-dna bg-no-repeat bg-cover">
@@ -352,7 +371,12 @@ export default function Dashboard() {
                              </div>
                           </TableCell>
                           <TableCell className="text-center font-heading font-black italic text-primary text-xl">{lead.current_step}</TableCell>
-                          <TableCell className="text-right px-6"><Badge className="text-[9px] uppercase">{lead.status}</Badge></TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex flex-col items-end gap-1">
+                               <Badge className="text-[9px] uppercase">{lead.status}</Badge>
+                               {lead.is_muted && <span className="text-[8px] text-red-500 font-mono uppercase font-bold animate-pulse">MUDO</span>}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -367,8 +391,11 @@ export default function Dashboard() {
                       {leads.map(lead => (
                         <button key={lead.id} onClick={() => setSelectedLead(lead)} className={`w-full p-4 border-b border-white/5 text-left hover:bg-white/5 transition-all ${selectedLead?.id === lead.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
                            <div className="flex justify-between items-start mb-1">
-                              <div className="text-xs font-bold uppercase">{lead.name || lead.whatsapp}</div>
-                              <div className="text-[10px] font-mono text-primary">SCP: {lead.score || 0}</div>
+                              <div className="text-xs font-bold uppercase truncate max-w-[120px]">{lead.name || lead.whatsapp}</div>
+                              <div className="flex items-center gap-2">
+                                 {lead.is_muted ? <Pause className="w-3 h-3 text-red-500" /> : <Zap className="w-3 h-3 text-primary" />}
+                                 <div className="text-[10px] font-mono opacity-40">SCP: {lead.score || 0}</div>
+                              </div>
                            </div>
                            <div className="flex flex-wrap gap-1">
                               {lead.tags?.slice(0, 2).map(tag => <span key={tag} className="text-[8px] opacity-40 uppercase font-mono">{tag}</span>)}
@@ -376,14 +403,47 @@ export default function Dashboard() {
                         </button>
                       ))}
                   </div>
-                  <div className="lg:col-span-2 glass-card p-6 flex flex-col bg-zinc-900/40 min-h-[400px]">
+                  <div className="lg:col-span-2 glass-card p-6 flex flex-col bg-zinc-900/40 min-h-[500px]">
                      {selectedLead ? (
-                        <div className="flex-1 overflow-y-auto space-y-4">
-                           {chatLogs.map(log => (
-                              <div key={log.id} className={`flex ${log.direction === 'inbound' ? 'justify-start' : 'justify-end'}`}>
-                                 <div className={`p-3 text-xs ${log.direction === 'inbound' ? 'bg-zinc-800' : 'bg-primary/20'}`}>{log.content}</div>
+                        <div className="flex flex-col h-full gap-4">
+                           <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                              <div className="flex flex-col">
+                                 <h3 className="text-sm font-bold uppercase">{selectedLead.name || 'HFN Fan'}</h3>
+                                 <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-500 uppercase mt-1">
+                                    <span>Score: <span className="text-primary">{selectedLead.score || 0}</span></span>
+                                    <span className="opacity-20">|</span>
+                                    <span>Tags: <span className="text-white">{selectedLead.tags?.join(', ') || 'Sem tags'}</span></span>
+                                 </div>
                               </div>
-                           ))}
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleToggleMute(selectedLead.id, selectedLead.is_muted || false)}
+                                className={`h-8 px-4 text-[10px] font-black italic uppercase rounded-none transition-all ${selectedLead.is_muted ? 'bg-red-600/20 border-red-600/40 text-red-500 hover:bg-red-600/30' : 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'}`}
+                              >
+                                 {selectedLead.is_muted ? <Play className="w-3 h-3 mr-2 text-white" /> : <Pause className="w-3 h-3 mr-2" />}
+                                 {selectedLead.is_muted ? 'Ativar Automação' : 'Pausar Automação'}
+                              </Button>
+                           </div>
+
+                           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                              {chatLogs
+                                .filter(log => log.lead_id === selectedLead.id)
+                                .map(log => (
+                                 <div key={log.id} className={`flex ${log.direction === 'inbound' ? 'justify-start' : 'justify-end'}`}>
+                                    <div className={`p-3 text-xs max-w-[80%] flex flex-col gap-2 ${log.direction === 'inbound' ? 'bg-zinc-800 border border-white/5' : 'bg-primary/20 border border-primary/20'}`}>
+                                       <div className="flex items-center gap-2 mb-1">
+                                          {log.message_type === 'link_click' ? <ExternalLink className="w-3 h-3 text-primary" /> :
+                                           log.message_type === 'image' ? <Zap className="w-3 h-3 text-yellow-500 font-bold" /> :
+                                           log.direction === 'inbound' ? <MessageSquare className="w-3 h-3 opacity-30" /> : 
+                                           <Send className="w-3 h-3 text-primary opacity-50" />}
+                                          <span className="text-[8px] font-mono opacity-40 uppercase tracking-widest">{log.message_type}</span>
+                                       </div>
+                                       <span className="leading-relaxed">{log.content}</span>
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
                         </div>
                      ) : <div className="h-full flex items-center justify-center opacity-20 uppercase text-[10px]">Selecione um lead</div>}
                   </div>
