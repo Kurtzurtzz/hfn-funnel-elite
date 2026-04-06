@@ -19,8 +19,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
 export default function PublicFunnel() {
-  const [name, setName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [utmParams, setUtmParams] = useState({ s: '', m: '', c: '', co: '' });
+  const [acceptedLgpd, setAcceptedLgpd] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prize, setPrize] = useState('Bônus de 100% + Tips VIP');
   const [botPhone, setBotPhone] = useState('5521986747506'); // Default fallback
@@ -45,44 +45,39 @@ export default function PublicFunnel() {
       const { data } = await supabase.from('hfn_funnel_settings').select('phone_number').limit(1).single();
       if (data?.phone_number) setBotPhone(data.phone_number.replace(/\D/g, ''));
     };
+
+    const captureUtms = () => {
+      const params = new URLSearchParams(window.location.search);
+      setUtmParams({
+        s: params.get('utm_source') || 'direto',
+        m: params.get('utm_medium') || 'nenhum',
+        c: params.get('utm_campaign') || 'organico',
+        co: params.get('utm_content') || 'v3'
+      });
+    };
     
     fetchSettings();
+    captureUtms();
     return () => clearInterval(interval);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!whatsapp || whatsapp.length < 10) {
-      toast.error("Por favor, insira um WhatsApp válido.");
+  const handleClaim = async () => {
+    if (!acceptedLgpd) {
+      toast.error("Por favor, aceite os termos de uso (LGPD).");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Save Lead to Supabase
-      const { error } = await supabase.from('hfn_funnel_leads').insert({
-        name,
-        whatsapp,
-        current_step: 0,
-        status: 'active',
-        metadata: {
-          source: 'Public_Funnel_HFN',
-          prize_claimed: prize
-        }
-      });
+      toast.success("Acesso liberado! Abrindo seu WhatsApp...");
 
-      if (error) throw error;
-
-      // 2. Success Feedback
-      toast.success("Acesso liberado! Redirecionando...");
-
-      // 3. WhatsApp Redirect (Using Dynamic Bot Phone)
-      const message = encodeURIComponent(`Oi Helen! Acabei de me cadastrar no Funil HFN e quero meu ${prize}!`);
+      const ref = `[REF:${utmParams.s}|${utmParams.m}|${utmParams.c}|${utmParams.co}]`;
+      const message = encodeURIComponent(`Oi Helen! Acabei de garantir meu acesso no site e quero meu ${prize}! ${ref}`);
       const waLink = `https://wa.me/${botPhone}?text=${message}`;
       
       setTimeout(() => {
         window.location.href = waLink;
-      }, 1500);
+      }, 1200);
 
     } catch (err: any) {
       console.error(err);
@@ -138,36 +133,36 @@ export default function PublicFunnel() {
            
            <div className="mb-8 text-center">
               <h2 className="text-xl font-heading font-bold italic uppercase mb-2">Liberação Imediata</h2>
-              <p className="text-zinc-400 text-xs font-medium">Insira seus dados abaixo para receber o bônus e entrar no grupo de WhatsApp.</p>
            </div>
 
-           <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                 <Label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 pl-1">Seu Nome</Label>
-                 <Input 
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, ""))}
-                    placeholder="Ex: João Silva"
-                    className="h-14 bg-black/40 border-white/5 rounded-none font-medium placeholder:text-zinc-700 focus-visible:ring-primary/40 transition-all text-sm"
-                 />
+           <div className="space-y-8">
+              <div className="bg-primary/5 border border-primary/10 p-6 text-center space-y-4">
+                 <div className="flex justify-center">
+                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+                        <Zap className="w-8 h-8 text-primary" />
+                    </div>
+                 </div>
+                 <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-mono tracking-widest text-primary font-bold">Protocolo de Elite HFN</p>
+                    <h3 className="text-sm font-bold text-white uppercase italic">Sua vaga está pré-aprovada!</h3>
+                 </div>
               </div>
 
-              <div className="space-y-2">
-                 <Label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 pl-1">WhatsApp (DDD + Número)</Label>
-                 <Input 
-                    required
-                    type="tel"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ""))}
-                    placeholder="21999999999"
-                    className="h-14 bg-black/40 border-white/5 rounded-none font-mono placeholder:text-zinc-700 focus-visible:ring-primary/40 transition-all text-sm"
-                 />
+              <div className="flex items-start gap-4 p-4 border border-white/5 bg-black/20 hover:bg-black/40 transition-all cursor-pointer group" onClick={() => setAcceptedLgpd(!acceptedLgpd)}>
+                 <div className={`mt-1 w-5 h-5 border flex items-center justify-center transition-all ${acceptedLgpd ? 'bg-primary border-primary' : 'border-white/20'}`}>
+                    {acceptedLgpd && <ShieldCheck className="w-3 h-3 text-white" />}
+                 </div>
+                 <div className="flex-1 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-white leading-tight">Concordo com os termos e política de privacidade (LGPD)</p>
+                    <p className="text-[8px] text-zinc-500 uppercase font-mono">HFN_SYSTEMS // SECURE_PROTOCOL_PROTECTED</p>
+                 </div>
               </div>
 
               <Button 
+                onClick={handleClaim}
                 disabled={isSubmitting}
-                className="w-full h-16 bg-primary hover:bg-primary/90 text-white font-heading font-black italic uppercase text-lg rounded-none shadow-[0_10px_30px_rgba(217,26,26,0.4)] transition-all group overflow-hidden relative"
+                className={`w-full h-20 font-heading font-black italic uppercase text-lg rounded-none shadow-[0_15px_40px_rgba(217,26,26,0.5)] transition-all group overflow-hidden relative ${!acceptedLgpd && 'opacity-50 grayscale'}`}
+                style={{ backgroundColor: '#D91A1A' }}
               >
                  <AnimatePresence mode="wait">
                    {isSubmitting ? (
@@ -191,7 +186,7 @@ export default function PublicFunnel() {
                    )}
                  </AnimatePresence>
               </Button>
-           </form>
+           </div>
 
            {/* Security Stamp */}
            <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center gap-6 opacity-40 grayscale">

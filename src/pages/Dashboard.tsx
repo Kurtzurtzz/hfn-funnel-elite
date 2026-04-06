@@ -27,6 +27,9 @@ interface Lead {
   status: string;
   last_sent_at?: string;
   metadata?: any;
+  score?: number;
+  tags?: string[];
+  utm_source?: string;
 }
 
 interface Message {
@@ -57,6 +60,7 @@ interface FunnelSettings {
   access_token: string;
   is_active: boolean;
   phone_number?: string;
+  lgpd_policy_url?: string;
 }
 
 export default function Dashboard() {
@@ -68,7 +72,8 @@ export default function Dashboard() {
     business_account_id: '',
     access_token: '',
     is_active: true,
-    phone_number: ''
+    phone_number: '',
+    lgpd_policy_url: ''
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,13 +260,26 @@ export default function Dashboard() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card overflow-hidden">
                  <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader><TableRow><TableHead className="text-[10px] uppercase">Lead</TableHead><TableHead className="text-[10px] uppercase text-center">Step</TableHead><TableHead className="text-[10px] uppercase px-6 text-right">Status</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead className="text-[10px] uppercase">Lead</TableHead><TableHead className="text-[10px] uppercase text-center">Score</TableHead><TableHead className="text-[10px] uppercase text-center">Step</TableHead><TableHead className="text-[10px] uppercase px-6 text-right">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {leads.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center py-20 text-xs uppercase opacity-40">Aguardando leads...</TableCell></TableRow> : leads.map(lead => (
                         <TableRow key={lead.id} className="border-white/5">
                           <TableCell className="py-4">
-                             <div className="font-bold text-white uppercase text-xs">{lead.name || 'Anonymous'}</div>
-                             <div className="text-[10px] text-zinc-500">{lead.whatsapp}</div>
+                             <div className="flex items-center gap-2 mb-1">
+                                <div className="font-bold text-white uppercase text-xs">{lead.name || 'Anonymous'}</div>
+                                {lead.utm_source && <Badge variant="outline" className="text-[8px] bg-white/5 border-none text-zinc-400">{lead.utm_source}</Badge>}
+                             </div>
+                             <div className="text-[10px] text-zinc-500 mb-2">{lead.whatsapp}</div>
+                             <div className="flex flex-wrap gap-1">
+                                {lead.tags?.map(tag => (
+                                   <span key={tag} className="text-[8px] bg-primary/10 text-primary px-1 font-mono">{tag}</span>
+                                ))}
+                             </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                             <div className="bg-zinc-900 w-10 h-10 flex items-center justify-center mx-auto rounded-full border border-white/5">
+                                <span className={`text-xs font-bold ${Number(lead.score || 0) > 30 ? 'text-green-500' : 'text-white'}`}>{lead.score || 0}</span>
+                             </div>
                           </TableCell>
                           <TableCell className="text-center font-heading font-black italic text-primary text-xl">{lead.current_step}</TableCell>
                           <TableCell className="text-right px-6"><Badge className="text-[9px] uppercase">{lead.status}</Badge></TableCell>
@@ -276,11 +294,17 @@ export default function Dashboard() {
             <TabsContent value="chat">
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[500px]">
                   <div className="lg:col-span-1 glass-card overflow-y-auto max-h-[600px]">
-                     {leads.map(lead => (
-                        <button key={lead.id} onClick={() => setSelectedLead(lead)} className={`w-full p-4 border-b border-white/5 text-left hover:bg-white/5 ${selectedLead?.id === lead.id ? 'bg-primary/10' : ''}`}>
-                           <div className="text-xs font-bold uppercase">{lead.name || lead.whatsapp}</div>
+                      {leads.map(lead => (
+                        <button key={lead.id} onClick={() => setSelectedLead(lead)} className={`w-full p-4 border-b border-white/5 text-left hover:bg-white/5 transition-all ${selectedLead?.id === lead.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
+                           <div className="flex justify-between items-start mb-1">
+                              <div className="text-xs font-bold uppercase">{lead.name || lead.whatsapp}</div>
+                              <div className="text-[10px] font-mono text-primary">SCP: {lead.score || 0}</div>
+                           </div>
+                           <div className="flex flex-wrap gap-1">
+                              {lead.tags?.slice(0, 2).map(tag => <span key={tag} className="text-[8px] opacity-40 uppercase font-mono">{tag}</span>)}
+                           </div>
                         </button>
-                     ))}
+                      ))}
                   </div>
                   <div className="lg:col-span-2 glass-card p-6 flex flex-col bg-zinc-900/40 min-h-[400px]">
                      {selectedLead ? (
@@ -373,6 +397,10 @@ export default function Dashboard() {
                      <div className="space-y-2">
                         <Label className="text-[10px] uppercase text-zinc-500">Access Token</Label>
                         <Input type="password" value={settings.access_token} onChange={(e) => setSettings({...settings, access_token: e.target.value})} className="bg-zinc-800 border-none h-12 rounded-none" />
+                     </div>
+                     <div className="space-y-2">
+                        <Label className="text-[10px] uppercase text-zinc-500">URL da Política de Privacidade (LGPD)</Label>
+                        <Input value={settings.lgpd_policy_url || ''} onChange={(e) => setSettings({...settings, lgpd_policy_url: e.target.value})} placeholder="https://..." className="bg-zinc-800 border-none h-12 rounded-none" />
                      </div>
                      <Button onClick={handleSaveSettings} disabled={isSaving} className="w-full bg-primary h-14 uppercase font-heading italic font-black rounded-none mt-4">Salvar Configurações</Button>
                   </div>

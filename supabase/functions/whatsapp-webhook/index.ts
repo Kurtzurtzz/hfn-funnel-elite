@@ -36,8 +36,16 @@ serve(async (req) => {
       const waId = contact.wa_id;
       const name = contact.profile?.name || "HFN Fan";
       const text = message.text?.body || "";
+      const type = message.type || "text";
 
-      // Check if lead already exists
+      // 1. UTM & Metadata Parser (Elite V3)
+      let utms = { s: 'direto', m: 'nenhum', c: 'organico', co: 'v3' };
+      const utmMatch = text.match(/\[REF:(.*?)\|(.*?)\|(.*?)\|(.*?)\]/);
+      if (utmMatch) {
+         utms = { s: utmMatch[1], m: utmMatch[2], c: utmMatch[3], co: utmMatch[4] };
+      }
+
+      // 2. Lead Discovery & Creation
       const { data: existingLead } = await supabase
         .from('hfn_funnel_leads')
         .select('*')
@@ -45,9 +53,10 @@ serve(async (req) => {
         .single();
 
       let leadId = existingLead?.id;
+      let isNewLead = false;
 
       if (!existingLead) {
-        // [ZAPIER-FEEL]: Create new lead
+        isNewLead = true;
         const { data: newLead, error: insertError } = await supabase
           .from('hfn_funnel_leads')
           .insert({
@@ -55,7 +64,13 @@ serve(async (req) => {
             name: name,
             current_step: 0,
             status: 'active',
-            metadata: { source: 'WhatsApp_Direct', first_message: text }
+            utm_source: utms.s,
+            utm_medium: utms.m,
+            utm_campaign: utms.c,
+            utm_content: utms.co,
+            score: 10, // Pontuação inicial por entrar no funil
+            tags: [`origem:${utms.s}`],
+            metadata: { source: 'WhatsApp_Direct', initial_ref: utms.s }
           })
           .select()
           .single();
@@ -64,14 +79,30 @@ serve(async (req) => {
         leadId = newLead.id;
       }
 
-      // 3. Update Lead State (Mark as Replied)
+      // 3. Advanced Intelligence: Scoring & Tagging
       if (leadId) {
+        let scoreBonus = 2; // Pontuação base por interação
+        let newTags = existingLead?.tags || [];
+
+        if (type === 'image') {
+          scoreBonus = 15; // Alto engajamento (mandou print/prova)
+          if (!newTags.includes('✅ Prova Enviada')) newTags.push('✅ Prova Enviada');
+        } else if (type === 'audio' || type === 'video') {
+          scoreBonus = 5;
+        }
+
+        // Tag de temperatura automática
+        const currentScore = (existingLead?.score || 0) + scoreBonus;
+        if (currentScore > 30 && !newTags.includes('🔥 Quente')) newTags.push('🔥 Quente');
+
         await supabase.from('hfn_funnel_leads').update({
           has_replied: true,
-          last_interaction_at: new Date().toISOString()
+          last_interaction_at: new Date().toISOString(),
+          score: currentScore,
+          tags: newTags
         }).eq('id', leadId);
 
-        // 4. Intelligence: Auto-advance on New Lead or Image Proof
+        // 4. Auto-Advance Logic
         const currentStep = existingLead?.current_step || 0;
         const { data: nextMsg } = await supabase
           .from('hfn_funnel_messages')
@@ -79,22 +110,21 @@ serve(async (req) => {
           .eq('step_number', currentStep + 1)
           .single();
 
-        const isNewLead = !existingLead;
-        const isImageProof = message.type === 'image' && nextMsg?.send_condition === 'on_image';
+        const isImageProof = type === 'image' && nextMsg?.send_condition === 'on_image';
 
         if (isNewLead || isImageProof) {
           console.log(`[HFN-FLUX] Triggering RPC for lead ${leadId} (Reason: ${isNewLead ? 'New' : 'Image'})...`);
           await supabase.rpc('hfn_send_via_sql', { lead_id: leadId });
         }
 
-        // 4. Log Incoming Message to Chat History
+        // 5. Audit Log (History)
         await supabase.from('hfn_funnel_chat_logs').insert({
           lead_id: leadId,
           direction: 'inbound',
-          message_type: message.type || 'text',
+          message_type: type,
           content: text || (message.image ? '[Imagem]' : message.audio ? '[Áudio]' : '[Mídia]'),
           media_url: message.image?.link || message.audio?.link || message.video?.link,
-          metadata: { message_id: message.id }
+          metadata: { message_id: message.id, type: type }
         });
       }
     }
