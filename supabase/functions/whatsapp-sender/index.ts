@@ -17,10 +17,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Process Pending Dispatches
-    const { data: pendingLeads, error: pendingError } = await supabase
-      .from('hfn_pending_dispatches')
-      .select('*')
+    // 1. Get Trigger Data from Request
+    let targetLeadId: string | null = null;
+    try {
+      const body = await req.json();
+      targetLeadId = body.lead_id;
+    } catch (e) {
+      // Not a JSON request or empty, continue with bulk processing if needed
+    }
+
+    // 2. Process Pending Dispatches
+    let query = supabase.from('hfn_pending_dispatches').select('*');
+    if (targetLeadId) {
+      query = query.eq('lead_id', targetLeadId);
+    }
+
+    const { data: pendingLeads, error: pendingError } = await query;
 
     if (pendingError) throw pendingError
 
@@ -38,11 +50,12 @@ serve(async (req) => {
       try {
         console.log(`[HFN-FLUX] Sending ${lead.message_type} to ${lead.whatsapp}...`)
 
-        // Variable Replacement (only for text)
+        // Variable Replacement & Newline Fix
         let messageContent = lead.content
-          ?.replace('{{name}}', lead.name || 'HFN Fan')
-          ?.replace('{{prize}}', 'Bônus de 100%')
-          ?.replace('{{link}}', 'https://helenfightnews.com/resgate')
+          ?.replace(/\{\{name\}\}/g, lead.name || 'HFN Fan')
+          ?.replace(/\{\{prize\}\}/g, 'Bônus de 100%')
+          ?.replace(/\{\{link\}\}/g, 'https://helenfightnews.com/resgate')
+          ?.replaceAll('\\n', '\n');
 
         // Build Payload based on message_type
         let requestBody: any = {
@@ -51,9 +64,9 @@ serve(async (req) => {
           to: lead.whatsapp,
         };
 
-        if (lead.message_type === 'text') {
+        if (lead.message_type === 'text' || !lead.message_type) {
           requestBody.type = "text";
-          requestBody.text = { body: messageContent };
+          requestBody.text = { body: messageContent, preview_url: true };
         } else if (lead.message_type === 'image') {
           requestBody.type = "image";
           requestBody.image = { link: lead.media_url, caption: messageContent };

@@ -62,20 +62,32 @@ serve(async (req) => {
 
         if (insertError) throw insertError;
         leadId = newLead.id;
-
-        // [INSTANT-REACTION]: Trigger the sender for Step 1 immediately
-        console.log(`[HFN-FLUX] Triggering instant Step 1 for ${waId}...`);
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-sender`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${req.headers.get('Authorization') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                'Content-Type': 'application/json'
-            }
-        });
       }
 
-      // 3. Log Incoming Message to Chat History
+      // 3. Update Lead State (Mark as Replied)
       if (leadId) {
+        await supabase.from('hfn_funnel_leads').update({
+          has_replied: true,
+          last_interaction_at: new Date().toISOString()
+        }).eq('id', leadId);
+
+        // 4. Intelligence: Auto-advance on New Lead or Image Proof
+        const currentStep = existingLead?.current_step || 0;
+        const { data: nextMsg } = await supabase
+          .from('hfn_funnel_messages')
+          .select('send_condition')
+          .eq('step_number', currentStep + 1)
+          .single();
+
+        const isNewLead = !existingLead;
+        const isImageProof = message.type === 'image' && nextMsg?.send_condition === 'on_image';
+
+        if (isNewLead || isImageProof) {
+          console.log(`[HFN-FLUX] Triggering RPC for lead ${leadId} (Reason: ${isNewLead ? 'New' : 'Image'})...`);
+          await supabase.rpc('hfn_send_via_sql', { lead_id: leadId });
+        }
+
+        // 4. Log Incoming Message to Chat History
         await supabase.from('hfn_funnel_chat_logs').insert({
           lead_id: leadId,
           direction: 'inbound',

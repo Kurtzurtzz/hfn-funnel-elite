@@ -10,7 +10,7 @@ function App() {
         <Toaster position="top-right" richColors />
         <Routes>
           <Route path="/" element={<PublicFunnel />} />
-          <Route path="/admin" element={<Dashboard />} />
+          <Route path="/hfn-command-center" element={<Dashboard />} />
           <Route path="*" element={<div className="flex items-center justify-center h-screen italic text-zinc-500 uppercase tracking-widest font-mono">HFN_SYSTEMS // 404_NOT_FOUND</div>} />
         </Routes>
       </div>

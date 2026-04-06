@@ -5,7 +5,7 @@ import {
   MessageSquare, Users, Settings, Clock, Send, 
   CheckCircle2, AlertCircle, Play, Pause, Edit2, 
   Zap, ShieldCheck, Mail, Phone, ExternalLink, Save,
-  RefreshCw, MousePointer2, ChevronRight
+  RefreshCw, MousePointer2, ChevronRight, ShieldAlert
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,7 @@ interface Message {
   is_active: boolean;
   message_type: 'text' | 'image' | 'audio' | 'video';
   media_url?: string;
+  send_condition?: string;
 }
 
 interface ChatLog {
@@ -74,6 +75,23 @@ export default function Dashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [chatLogs, setChatLogs] = useState<ChatLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessPass, setAccessPass] = useState("");
+
+  useEffect(() => {
+    const isAuth = localStorage.getItem('hfn_auth') === 'true';
+    if (isAuth) setIsAuthenticated(true);
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (accessPass === 'hfn_secure_2026') {
+      setIsAuthenticated(true);
+      localStorage.setItem('hfn_auth', 'true');
+    } else {
+      toast.error("Senha incorreta!");
+    }
+  };
 
   // --- DATA FETCHING ---
   useEffect(() => {
@@ -167,11 +185,42 @@ export default function Dashboard() {
 
   const handleUpdateMessage = async (msg: Message) => {
     try {
-      const { error } = await supabase.from('hfn_funnel_messages').update({ ...msg }).eq('id', msg.id);
+      const { error } = await supabase.from('hfn_funnel_messages').update({ 
+        content: msg.content,
+        delay_minutes: msg.delay_minutes,
+        media_url: msg.media_url,
+        send_condition: msg.send_condition || 'always'
+      }).eq('id', msg.id);
       if (error) throw error;
       toast.success(`Step ${msg.step_number} atualizado!`);
     } catch (err: any) { toast.error(err.message); }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-6 bg-hfn-dna bg-no-repeat bg-cover">
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-10 w-full max-w-sm text-center">
+          <div className="flex justify-center mb-6">
+             <div className="bg-red-600/20 p-4 rounded-full border border-red-600/30">
+                <ShieldAlert className="w-8 h-8 text-red-500" />
+             </div>
+          </div>
+          <h2 className="font-heading italic uppercase text-2xl font-black mb-2">Acesso Restrito</h2>
+          <p className="text-[10px] uppercase text-zinc-500 mb-8 font-mono">HFN_SYSTEMS // SECURE_ACCESS</p>
+          <form onSubmit={handleLogin} className="space-y-4">
+             <Input 
+                type="password" 
+                placeholder="SENHA DE ACESSO" 
+                value={accessPass}
+                onChange={(e) => setAccessPass(e.target.value)}
+                className="bg-zinc-800/50 border-none h-14 text-center text-xl tracking-[1em] focus:ring-1 focus:ring-primary"
+             />
+             <Button type="submit" className="w-full h-14 bg-primary uppercase font-heading italic font-black text-lg">ENTRAR</Button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white mobile-safe-padding py-6 md:py-12 font-body">
@@ -270,6 +319,21 @@ export default function Dashboard() {
                            />
                         </div>
                         <div className="space-y-2">
+                           <Label className="text-[9px] uppercase text-zinc-500">Condição de Envio</Label>
+                           <select 
+                              value={msg.send_condition || 'always'} 
+                              onChange={(e) => {
+                                 const n = [...messages]; n[idx].send_condition = e.target.value; setMessages(n);
+                              }}
+                              className="w-full bg-black/40 border-white/5 p-3 text-[10px] focus:ring-1 focus:ring-primary outline-none text-white appearance-none cursor-pointer"
+                           >
+                              <option value="always">🚀 Sempre Enviar (Padrão)</option>
+                              <option value="not_replied">⏳ Somente se NÃO respondeu (Remarketing)</option>
+                              <option value="replied">✅ Somente se JÁ respondeu</option>
+                              <option value="on_image">📷 Aguardar Print/Imagem para Enviar</option>
+                           </select>
+                        </div>
+                        <div className="space-y-2">
                            <Label className="text-[9px] uppercase text-zinc-500">URL da Mídia (Link do Áudio/Imagem no Supabase)</Label>
                            <Input 
                               value={msg.media_url || ''} 
@@ -294,7 +358,7 @@ export default function Dashboard() {
                   <div className="space-y-4">
                      <div className="space-y-2">
                         <Label className="text-[10px] uppercase text-zinc-500">WhatsApp Oficial do Bot (DDI+DDD+Número)</Label>
-                        <Input value={settings.phone_number || ''} onChange={(e) => setSettings({...settings, phone_number: e.target.value})} placeholder="5521..." className="bg-zinc-800 border-none h-12 rounded-none" />
+                        <Input value={settings.phone_number || ''} onChange={(e) => setSettings({...settings, phone_number: e.target.value.replace(/\D/g, '')})} placeholder="5521..." className="bg-zinc-800 border-none h-12 rounded-none" />
                      </div>
                      <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-2">
