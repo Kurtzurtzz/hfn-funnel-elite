@@ -86,8 +86,9 @@ export default function Dashboard() {
         const { data: msgsData } = await supabase.from('hfn_funnel_messages').select('*').order('step_number', { ascending: true });
         if (msgsData) setMessages(msgsData);
 
-        const { data: settingsData } = await supabase.from('hfn_funnel_settings').select('*').single();
+        const { data: settingsData, error: settingsError } = await supabase.from('hfn_funnel_settings').select('*').limit(1).maybeSingle();
         if (settingsData) setSettings(settingsData);
+        else if (settingsError) console.error("Error fetching settings:", settingsError);
       } catch (error) {
         console.error("Error fetching HFN data:", error);
       } finally {
@@ -146,9 +147,17 @@ export default function Dashboard() {
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('hfn_funnel_settings').upsert({ ...settings, updated_at: new Date().toISOString() });
+      // Usamos upsert com a estratégia de garantir apenas uma linha (ID fixo se necessário ou id vindo do state)
+      const payload = { ...settings, updated_at: new Date().toISOString() };
+      
+      // Se não houver ID (primeiro save), o Supabase vai inserir. 
+      // Se houver, ele atualiza.
+      const { data, error } = await supabase.from('hfn_funnel_settings').upsert(payload).select().single();
+      
       if (error) throw error;
-      toast.success("Configurações salvas!");
+      if (data) setSettings(data); // Atualiza o estado com o ID gerado se for o primeiro save
+      
+      toast.success("Configurações salvas e persistidas!");
     } catch (error: any) {
       toast.error(error.message);
     } finally {
