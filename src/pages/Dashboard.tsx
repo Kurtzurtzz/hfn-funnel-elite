@@ -86,6 +86,8 @@ export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessPass, setAccessPass] = useState("");
   const [isUploading, setIsUploading] = useState<string | null>(null); // Armazena o ID da mensagem sendo enviada
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   useEffect(() => {
     const isAuth = localStorage.getItem('hfn_auth') === 'true';
@@ -262,6 +264,48 @@ export default function Dashboard() {
       toast.success(!currentStatus ? "Automação pausada para este lead" : "Automação reativada");
     } catch (err: any) {
       toast.error(err.message);
+    }
+  };
+
+  const handleSendManualMessage = async () => {
+    if (!selectedLead || !replyMessage.trim()) return;
+    
+    setIsSendingReply(true);
+    try {
+      // 1. Pegar as configurações atuais (para o token e phone_id)
+      const { data: settingsData } = await supabase.from('hfn_funnel_settings').select('*').limit(1).single();
+      if (!settingsData) throw new Error("Configurações do WhatsApp não encontradas!");
+
+      // 2. Inserir na fila de despacho
+      const { error } = await supabase.from('hfn_pending_dispatches').insert({
+        lead_id: selectedLead.id,
+        whatsapp: selectedLead.whatsapp,
+        content: replyMessage,
+        phone_number_id: settingsData.phone_number_id,
+        access_token: settingsData.access_token,
+        message_type: 'text',
+        next_step: selectedLead.current_step,
+        name: selectedLead.name
+      });
+
+      if (error) throw error;
+
+      // 3. Registrar no log local (otimismo)
+      setChatLogs(prev => [...prev, {
+        id: Math.random().toString(),
+        lead_id: selectedLead.id,
+        direction: 'outbound',
+        message_type: 'manual_reply',
+        content: replyMessage,
+        created_at: new Date().toISOString()
+      }]);
+
+      setReplyMessage("");
+      toast.success("Mensagem na fila de envio!");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
@@ -443,6 +487,25 @@ export default function Dashboard() {
                                     </div>
                                  </div>
                               ))}
+                           </div>
+
+                           <div className="pt-4 border-t border-white/5 flex gap-2">
+                              <Textarea 
+                                placeholder="DIGITE SUA RESPOSTA MANUAL..."
+                                value={replyMessage}
+                                onChange={(e) => setReplyMessage(e.target.value)}
+                                className="flex-1 min-h-[80px] bg-black/60 border-white/10 rounded-none text-xs focus:ring-1 focus:ring-primary outline-none"
+                                onKeyDown={(e) => {
+                                   if (e.key === 'Enter' && e.ctrlKey) handleSendManualMessage();
+                                }}
+                              />
+                              <Button 
+                                onClick={handleSendManualMessage} 
+                                disabled={isSendingReply || !replyMessage.trim()}
+                                className="h-auto px-6 bg-primary rounded-none font-heading italic font-black"
+                              >
+                                 {isSendingReply ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                              </Button>
                            </div>
                         </div>
                      ) : <div className="h-full flex items-center justify-center opacity-20 uppercase text-[10px]">Selecione um lead</div>}
