@@ -5,7 +5,7 @@ import {
   MessageSquare, Users, Settings, Clock, Send, 
   CheckCircle2, AlertCircle, Play, Pause, Edit2, 
   Zap, ShieldCheck, Mail, Phone, ExternalLink, Save,
-  RefreshCw, MousePointer2, ChevronRight, ShieldAlert
+  RefreshCw, MousePointer2, ChevronRight, ShieldAlert, Upload, Loader2
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +84,7 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessPass, setAccessPass] = useState("");
+  const [isUploading, setIsUploading] = useState<string | null>(null); // Armazena o ID da mensagem sendo enviada
 
   useEffect(() => {
     const isAuth = localStorage.getItem('hfn_auth') === 'true';
@@ -201,6 +202,48 @@ export default function Dashboard() {
       if (error) throw error;
       toast.success(`Step ${msg.step_number} atualizado!`);
     } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>, msgId: string, idx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limites básicos
+    if (file.size > 10 * 1024 * 1024) return toast.error("Arquivo muito grande (Máx 10MB)");
+    
+    setIsUploading(msgId);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${msgId}-${Math.random()}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('hfn-media')
+        .upload(filePath, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('hfn-media')
+        .getPublicUrl(filePath);
+
+      const n = [...messages];
+      n[idx].media_url = publicUrl;
+      
+      // Auto-detectar o tipo básico
+      if (['mp3', 'wav', 'ogg'].includes(fileExt?.toLowerCase() || '')) {
+         n[idx].message_type = 'audio';
+      } else if (['jpg', 'jpeg', 'png', 'webp'].includes(fileExt?.toLowerCase() || '')) {
+         n[idx].message_type = 'image';
+      }
+
+      setMessages(n);
+      toast.success("Mídia enviada e vinculada!");
+    } catch (err: any) {
+      toast.error(`Falha no upload: ${err.message}`);
+    } finally {
+      setIsUploading(null);
+    }
   };
 
   if (!isAuthenticated) {
@@ -422,16 +465,38 @@ export default function Dashboard() {
                            </select>
                         </div>
                         <div className="space-y-2">
-                           <Label className="text-[9px] uppercase text-zinc-500">URL da Mídia (Link do Áudio/Imagem no Supabase)</Label>
+                           <div className="flex items-center justify-between">
+                              <Label className="text-[9px] uppercase text-zinc-500">Mídia (Áudio/Imagem)</Label>
+                              <div className="relative">
+                                 <input 
+                                    type="file" 
+                                    id={`file-${msg.id}`} 
+                                    className="hidden" 
+                                    accept="audio/*,image/*"
+                                    onChange={(e) => handleUploadMedia(e, msg.id, idx)}
+                                    disabled={isUploading === msg.id}
+                                 />
+                                 <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-6 px-3 text-[8px] border-primary/40 text-primary hover:bg-primary hover:text-white rounded-none flex items-center gap-2"
+                                    onClick={() => document.getElementById(`file-${msg.id}`)?.click()}
+                                    disabled={isUploading === msg.id}
+                                 >
+                                    {isUploading === msg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                                    {isUploading === msg.id ? 'ENVIANDO...' : 'UPLOAD DIRETO'}
+                                 </Button>
+                              </div>
+                           </div>
                            <Input 
                               value={msg.media_url || ''} 
                               onChange={(e) => {
                                  const n = [...messages]; n[idx].media_url = e.target.value; setMessages(n);
                               }} 
-                              placeholder="https://..."
+                              placeholder="URL da mídia ou use o Upload Direto..."
                               className="bg-black/40 border-white/5 text-[10px] h-10 rounded-none focus:ring-1 focus:ring-primary" 
                            />
-                           <p className="text-[8px] text-zinc-600 italic">* Cole o Link Público do áudio que você subiu no Supabase Storage.</p>
+                           <p className="text-[8px] text-zinc-600 italic">* Suba o MP3 ou Imagem para hospedar automático no seu Supabase.</p>
                         </div>
                      </div>
                   </Card>
