@@ -23,6 +23,7 @@ export default function PublicFunnel() {
   const [whatsapp, setWhatsapp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prize, setPrize] = useState('Bônus de 100% + Tips VIP');
+  const [botPhone, setBotPhone] = useState('5521986747506'); // Default fallback
 
   // Simulated live winners for urgency
   const [lastWinner, setLastWinner] = useState({ name: 'Marcos R.', prize: 'R$ 50 via PIX' });
@@ -40,6 +41,12 @@ export default function PublicFunnel() {
       setLastWinner(random);
     }, 5000);
     
+    const fetchSettings = async () => {
+      const { data } = await supabase.from('hfn_funnel_settings').select('phone_number').limit(1).single();
+      if (data?.phone_number) setBotPhone(data.phone_number.replace(/\D/g, ''));
+    };
+    
+    fetchSettings();
     return () => clearInterval(interval);
   }, []);
 
@@ -69,9 +76,9 @@ export default function PublicFunnel() {
       // 2. Success Feedback
       toast.success("Acesso liberado! Redirecionando...");
 
-      // 3. WhatsApp Redirect (User-Initiated for Free Tier)
+      // 3. WhatsApp Redirect (Using Dynamic Bot Phone)
       const message = encodeURIComponent(`Oi Helen! Acabei de me cadastrar no Funil HFN e quero meu ${prize}!`);
-      const waLink = `https://wa.me/5521986747506?text=${message}`; // Using user's provided test number context
+      const waLink = `https://wa.me/${botPhone}?text=${message}`;
       
       setTimeout(() => {
         window.location.href = waLink;
