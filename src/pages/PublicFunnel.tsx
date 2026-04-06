@@ -147,7 +147,7 @@ export default function PublicFunnel() {
                  <Input 
                     required
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, ""))}
                     placeholder="Ex: João Silva"
                     className="h-14 bg-black/40 border-white/5 rounded-none font-medium placeholder:text-zinc-700 focus-visible:ring-primary/40 transition-all text-sm"
                  />
@@ -159,7 +159,7 @@ export default function PublicFunnel() {
                     required
                     type="tel"
                     value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
+                    onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ""))}
                     placeholder="21999999999"
                     className="h-14 bg-black/40 border-white/5 rounded-none font-mono placeholder:text-zinc-700 focus-visible:ring-primary/40 transition-all text-sm"
                  />
