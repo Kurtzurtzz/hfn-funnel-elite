@@ -66,6 +66,8 @@ interface FunnelSettings {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [filterTag, setFilterTag] = useState('');
+  const [filterScore, setFilterScore] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [settings, setSettings] = useState<FunnelSettings>({
     phone_number_id: '',
@@ -243,15 +245,38 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto">
         <Tabs defaultValue="leads" className="space-y-8" onValueChange={setActiveTab}>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <TabsList className="bg-zinc-900/50 border border-white/5 p-1 h-auto flex-wrap justify-center md:justify-start">
-              <TabsTrigger value="leads" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] md:text-xs px-4 md:px-6 py-2 transition-all text-white">Leads</TabsTrigger>
-              <TabsTrigger value="chat" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] md:text-xs px-4 md:px-6 py-2 transition-all text-white">Monitor</TabsTrigger>
-              <TabsTrigger value="sequence" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] md:text-xs px-4 md:px-6 py-2 transition-all text-white">Sequência</TabsTrigger>
-              <TabsTrigger value="settings" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] md:text-xs px-4 md:px-6 py-2 transition-all text-white">Config</TabsTrigger>
+          <div className="p-4 bg-zinc-900/30 border border-white/5 flex flex-wrap items-center gap-6">
+            <TabsList className="bg-zinc-900 border border-white/10 p-1">
+              <TabsTrigger value="leads" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] px-6 py-2 transition-all">Leads</TabsTrigger>
+              <TabsTrigger value="chat" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] px-6 py-2 transition-all">Monitor</TabsTrigger>
+              <TabsTrigger value="sequence" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] px-6 py-2 transition-all">Sequência</TabsTrigger>
+              <TabsTrigger value="settings" className="data-[state=active]:bg-primary uppercase font-heading italic text-[10px] px-6 py-2 transition-all">Config</TabsTrigger>
             </TabsList>
-            <div className="hidden md:flex items-center gap-4 text-zinc-500 text-[10px] font-mono uppercase">
-               <span>Total Leads: <span className="text-white">{leads.length}</span></span>
+
+            <div className="flex items-center gap-4 border-l border-white/10 pl-6 h-8">
+               <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-2 py-1">
+                  <span className="text-[8px] font-mono text-primary uppercase">Filtro_Tag:</span>
+                  <input 
+                    className="bg-transparent border-none text-[10px] text-zinc-300 focus:ring-0 w-24 outline-none uppercase"
+                    placeholder="DIGITE UMA TAG..."
+                    value={filterTag}
+                    onChange={(e) => setFilterTag(e.target.value.toUpperCase())}
+                  />
+               </div>
+               <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-2 py-1">
+                  <span className="text-[8px] font-mono text-primary uppercase">Score_Gt:</span>
+                  <input 
+                    type="number"
+                    className="bg-transparent border-none text-[10px] text-zinc-300 focus:ring-0 w-12 outline-none"
+                    value={filterScore}
+                    onChange={(e) => setFilterScore(Number(e.target.value))}
+                  />
+               </div>
+               <div className="flex items-center gap-4 text-zinc-500 text-[10px] font-mono uppercase ml-auto">
+                  <span>Filtrados: <span className="text-white">{(leads.filter(l => (!filterTag || l.tags?.includes(filterTag)) && (l.score || 0) >= filterScore)).length}</span></span>
+                  <span className="opacity-20">|</span>
+                  <span>Total CRM: <span className="text-zinc-400">{leads.length}</span></span>
+               </div>
             </div>
           </div>
 
@@ -262,7 +287,9 @@ export default function Dashboard() {
                   <Table>
                     <TableHeader><TableRow><TableHead className="text-[10px] uppercase">Lead</TableHead><TableHead className="text-[10px] uppercase text-center">Score</TableHead><TableHead className="text-[10px] uppercase text-center">Step</TableHead><TableHead className="text-[10px] uppercase px-6 text-right">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {leads.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center py-20 text-xs uppercase opacity-40">Aguardando leads...</TableCell></TableRow> : leads.map(lead => (
+                      {(leads.length === 0) ? <TableRow><TableCell colSpan={4} className="text-center py-20 text-xs uppercase opacity-40">Aguardando leads...</TableCell></TableRow> : leads
+                        .filter(l => (!filterTag || l.tags?.includes(filterTag)) && (l.score || 0) >= filterScore)
+                        .map(lead => (
                         <TableRow key={lead.id} className="border-white/5">
                           <TableCell className="py-4">
                              <div className="flex items-center gap-2 mb-1">
@@ -320,7 +347,44 @@ export default function Dashboard() {
                </div>
             </TabsContent>
 
-            <TabsContent value="sequence" className="space-y-4">
+            <TabsContent value="sequence" className="space-y-6">
+               {/* 🔗 Tracker Generator (ELITE Tool) */}
+               <Card className="bg-primary/10 border-primary/30 rounded-none p-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><MousePointer2 className="w-20 h-20 rotate-12" /></div>
+                  <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+                     <div className="flex-1">
+                        <Label className="text-[10px] uppercase font-black italic text-primary flex items-center gap-2 mb-3">
+                           <Zap className="w-3 h-3" /> Gerador de Link Rastreado (CTR + Score)
+                        </Label>
+                        <p className="text-[10px] text-zinc-400 mb-4 font-mono uppercase leading-relaxed">
+                           USE EM SUAS MENSAGENS PARA TRACKEAR CLIQUES E MARCAR "LEADS QUENTES" AUTOMATICAMENTE.
+                        </p>
+                        <div className="flex flex-col md:flex-row gap-4">
+                           <div className="flex-1">
+                              <Input 
+                                 placeholder="URL DE DESTINO (EX: HTTPS://SEUSITE.COM)"
+                                 className="bg-black/60 border-white/5 h-12 text-[10px] font-mono rounded-none"
+                                 id="destUrl"
+                              />
+                           </div>
+                           <Button 
+                              variant="outline" 
+                              className="h-12 px-6 border-primary/40 text-primary text-[10px] font-bold rounded-none hover:bg-primary hover:text-white"
+                              onClick={() => {
+                                 const dest = (document.getElementById('destUrl') as HTMLInputElement).value;
+                                 if (!dest) return toast.error("Insira a URL de destino!");
+                                 const trackerUrl = `https://ugfeuslfymvjdplkzwpy.supabase.co/functions/v1/hfn-link-tracker?lead_id={{id}}&url=${dest}`;
+                                 navigator.clipboard.writeText(trackerUrl);
+                                 toast.success("Link com ID DINÂMICO copiado!");
+                              }}
+                           >
+                              GERAR E COPIAR
+                           </Button>
+                        </div>
+                     </div>
+                  </div>
+               </Card>
+
                {messages.map((msg, idx) => (
                   <Card key={msg.id} className="bg-zinc-900 border-white/5 rounded-none p-6">
                      <div className="flex items-center gap-4 mb-4">

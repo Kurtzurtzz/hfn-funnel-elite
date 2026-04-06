@@ -48,7 +48,14 @@ serve(async (req) => {
     // 2. Loop and Send
     for (const lead of pendingLeads) {
       try {
-        console.log(`[HFN-FLUX] Sending ${lead.message_type} to ${lead.whatsapp}...`)
+        console.log(`[HFN-FLUX] Humanizing send to ${lead.whatsapp}...`)
+
+        // --- Strategic Jitter (Delay Aleatório) ---
+        // Adiciona um delay aleatório de 2 a 12 segundos antes de enviar para simular digitação
+        const jitter = Math.floor(Math.random() * 10000) + 2000;
+        await new Promise(r => setTimeout(r, jitter));
+        
+        console.log(`[HFN-FLUX] Sending ${lead.message_type} to ${lead.whatsapp} after ${jitter}ms jitter...`)
 
         // Variable Replacement & Newline Fix
         let messageContent = lead.content

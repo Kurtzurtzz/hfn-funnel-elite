@@ -98,6 +98,7 @@ serve(async (req) => {
         await supabase.from('hfn_funnel_leads').update({
           has_replied: true,
           last_interaction_at: new Date().toISOString(),
+          last_message_content: text,
           score: currentScore,
           tags: newTags
         }).eq('id', leadId);
