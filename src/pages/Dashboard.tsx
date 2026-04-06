@@ -256,11 +256,32 @@ export default function Dashboard() {
                            const n = [...messages]; n[idx].delay_minutes = parseInt(e.target.value); setMessages(n);
                         }} />
                         <span className="text-[10px] uppercase font-mono text-zinc-500">Minutos</span>
-                        <Button onClick={() => handleUpdateMessage(msg)} size="sm" className="h-8 px-4 text-[10px] bg-primary rounded-none ml-auto">Salvar</Button>
+                        <Button onClick={() => handleUpdateMessage(msg)} size="sm" className="h-8 px-4 text-[10px] bg-primary rounded-none ml-auto hover:bg-white hover:text-black transition-colors">Salvar Passo</Button>
                      </div>
-                     <Textarea value={msg.content} onChange={(e) => {
-                        const n = [...messages]; n[idx].content = e.target.value; setMessages(n);
-                     }} className="bg-black/40 border-white/5 text-xs h-32 rounded-none" />
+                     <div className="space-y-4">
+                        <div className="space-y-2">
+                           <Label className="text-[9px] uppercase text-zinc-500">Mensagem de Texto</Label>
+                           <Textarea 
+                              value={msg.content} 
+                              onChange={(e) => {
+                                 const n = [...messages]; n[idx].content = e.target.value; setMessages(n);
+                              }} 
+                              className="bg-black/40 border-white/5 text-xs h-32 rounded-none focus:ring-1 focus:ring-primary outline-none" 
+                           />
+                        </div>
+                        <div className="space-y-2">
+                           <Label className="text-[9px] uppercase text-zinc-500">URL da Mídia (Link do Áudio/Imagem no Supabase)</Label>
+                           <Input 
+                              value={msg.media_url || ''} 
+                              onChange={(e) => {
+                                 const n = [...messages]; n[idx].media_url = e.target.value; setMessages(n);
+                              }} 
+                              placeholder="https://..."
+                              className="bg-black/40 border-white/5 text-[10px] h-10 rounded-none focus:ring-1 focus:ring-primary" 
+                           />
+                           <p className="text-[8px] text-zinc-600 italic">* Cole o Link Público do áudio que você subiu no Supabase Storage.</p>
+                        </div>
+                     </div>
                   </Card>
                ))}
             </TabsContent>
